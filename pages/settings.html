@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - What I Own</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@16.0.2"></script>
+    <script src="../js/app.js"></script>
+</head>
+
+<body>
+    <div class="container" style="max-width: 600px;">
+        <header class="mb-1 mt-1">
+            <h1>Settings</h1>
+        </header>
+
+        <div class="card mb-1">
+            <h3>Account</h3>
+            <form id="password-form" class="mt-1">
+                <div class="form-group">
+                    <label for="new-pass">New Password</label>
+                    <input type="password" id="new-pass" required>
+                </div>
+                <button type="submit">Update Password</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h3>App Config (Admin)</h3>
+            <p>Experimental Features: <span id="exp-feat">Loading...</span></p>
+        </div>
+
+        <div class="mt-2 text-center">
+            <a href="dashboard.html"><button class="secondary">Back to Dashboard</button></a>
+        </div>
+    </div>
+
+    <script>
+        requireAuth();
+
+        document.getElementById('password-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const pass = document.getElementById('new-pass').value;
+            try {
+                await account.updatePassword(pass);
+                alert('Password updated.');
+                document.getElementById('new-pass').value = '';
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        });
+
+        // Load App Settings
+        databases.listDocuments(DB_ID, COLLECTIONS.APP_SETTINGS).then(res => {
+            const settings = res.documents;
+            /* 
+               Assuming logic to find specific setting 
+               e.g. key 'experimental_features'
+            */
+            const exp = settings.find(s => s.settingKey === 'experimental_features');
+            document.getElementById('exp-feat').textContent = exp ? exp.settingValue : 'Disabled';
+        }).catch(e => {
+            document.getElementById('exp-feat').textContent = 'Restricted';
+        });
+    </script>
+</body>
+
+</html>

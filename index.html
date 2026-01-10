@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>What I Own - Welcome</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@16.0.2"></script>
+    <script src="js/app.js"></script>
+    <style>
+        .hero {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container hero">
+        <h1>What I Own</h1>
+        <p class="mb-1">Your personal wardrobe manager and outfit generator.</p>
+
+        <div id="auth-buttons">
+            <a href="pages/login.html"><button>Login</button></a>
+            <a href="pages/signup.html"><button class="secondary">Sign Up</button></a>
+        </div>
+
+        <div id="loading" class="mt-1">Checking session...</div>
+    </div>
+
+    <script>
+        // Simple session check
+        getCurrentUser().then(user => {
+            document.getElementById('loading').style.display = 'none';
+            if (user) {
+                // If user is logged in, redirect to dashboard
+                window.location.href = 'pages/dashboard.html';
+            }
+            // else stay here
+        });
+    </script>
+</body>
+
+</html>

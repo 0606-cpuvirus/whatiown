@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - What I Own</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@16.0.2"></script>
+    <script src="../js/app.js"></script>
+    <style>
+        .stat-card {
+            background: #222;
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header class="flex justify-between mb-1 mt-1">
+            <h1 id="welcome-msg">Hello!</h1>
+            <div>
+                <a href="settings.html" style="margin-right: 1rem;">Settings</a>
+                <button onclick="logout()">Logout</button>
+            </div>
+        </header>
+
+        <!-- Weather / Season Placeholder -->
+        <section class="card mb-1">
+            <h3>Today's Outlook</h3>
+            <p id="weather-display">Loading local weather...</p>
+        </section>
+
+        <!-- Quick Actions -->
+        <section class="grid-3 mb-1">
+            <a href="generator.html">
+                <div class="card text-center"
+                    style="height: 100%; display: flex; align-items: center; justify-content: center; background: #333;">
+                    <h2>Generate Outfit</h2>
+                </div>
+            </a>
+            <a href="add-item.html">
+                <div class="card text-center"
+                    style="height: 100%; display: flex; align-items: center; justify-content: center; background: #333;">
+                    <h2>Add Item</h2>
+                </div>
+            </a>
+            <a href="wardrobe.html">
+                <div class="card text-center"
+                    style="height: 100%; display: flex; align-items: center; justify-content: center; background: #333;">
+                    <h2>My Wardrobe</h2>
+                </div>
+            </a>
+        </section>
+
+        <div class="grid-2">
+            <!-- Last Generated Outfit -->
+            <section class="card">
+                <h3>Last Generated Outfit</h3>
+                <div id="last-outfit">Loading...</div>
+            </section>
+
+            <!-- Mini Stats -->
+            <section class="card">
+                <h3>Wardrobe Insights</h3>
+                <div id="mini-stats">Loading...</div>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        requireAuth().then(async (user) => {
+            // 1. Get Profile Name
+            try {
+                const profile = await databases.getDocument(DB_ID, COLLECTIONS.USER_PROFILES, user.$id);
+                document.getElementById('welcome-msg').textContent = `Hello, ${profile.displayName}!`;
+
+                // Set weather based on profile location (Mock for wireframe)
+                document.getElementById('weather-display').textContent = `Season: Data coming soon for ${profile.defaultLocation || 'your location'}.`;
+            } catch (e) {
+                console.error("Profile error", e);
+            }
+
+            // 2. Get Last Generated Outfit
+            try {
+                const outfits = await databases.listDocuments(
+                    DB_ID,
+                    COLLECTIONS.GENERATED_OUTFITS,
+                    [
+                        Appwrite.Query.equal('userId', user.$id),
+                        Appwrite.Query.orderDesc('createdAt'),
+                        Appwrite.Query.limit(1)
+                    ]
+                );
+
+                if (outfits.documents.length > 0) {
+                    const last = outfits.documents[0];
+                    document.getElementById('last-outfit').innerHTML = `
+                        <p><strong>${last.outfitName || 'Outfit #' + last.outfitNumber}</strong></p>
+                        <p>${last.explanationShort}</p>
+                        <a href="outfit-details.html?id=${last.$id}"><button class="mt-1" style="font-size: 0.8rem;">View Details</button></a>
+                    `;
+                } else {
+                    document.getElementById('last-outfit').textContent = "No outfits generated yet.";
+                }
+            } catch (e) {
+                console.error("Outfit fetch error", e);
+                document.getElementById('last-outfit').textContent = "Error loading outfit.";
+            }
+
+            // 3. Get / Calculate Mini Stats
+            // Trying to fetch pre-calculated stats first
+            try {
+                const stats = await databases.listDocuments(
+                    DB_ID,
+                    COLLECTIONS.WARDROBE_STATISTICS,
+                    [
+                        Appwrite.Query.equal('userId', user.$id),
+                        Appwrite.Query.equal('periodType', 'all_time'), // Assuming 'all_time' exists
+                        Appwrite.Query.limit(1)
+                    ]
+                );
+
+                if (stats.documents.length > 0) {
+                    const stat = stats.documents[0];
+                    document.getElementById('mini-stats').innerHTML = `
+                        <p>Total Items: ${stat.totalItems || 'N/A'}</p> 
+                        <p>Most Worn: ${stat.mostWornItems[0] || 'None'}</p>
+                    `;
+                } else {
+                    // Fallback to counting items directly
+                    const items = await databases.listDocuments(
+                        DB_ID,
+                        COLLECTIONS.WARDROBE_ITEMS,
+                        [Appwrite.Query.equal('userId', user.$id), Appwrite.Query.limit(1)] // Just to check total
+                    );
+                    document.getElementById('mini-stats').innerHTML = `
+                        <p>Total Items: ${items.total}</p>
+                        <p class="mt-1"><a href="statistics.html">View Full Analytics</a></p>
+                    `;
+                }
+
+            } catch (e) {
+                console.error("Stats error", e);
+                document.getElementById('mini-stats').textContent = "Stats unavailable.";
+            }
+        });
+    </script>
+</body>
+
+</html>

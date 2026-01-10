@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Outfit Details - What I Own</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@16.0.2"></script>
+    <script src="../js/app.js"></script>
+    <style>
+        .outfit-hero {
+            position: relative;
+            background: #222;
+            min-height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            overflow: hidden;
+        }
+
+        .outfit-hero img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        .rating-stars {
+            font-size: 1.5rem;
+            color: #ffd700;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container" style="max-width: 800px;">
+        <header class="mb-1 mt-1 flex justify-between">
+            <a href="dashboard.html">&larr; Back to Dashboard</a>
+            <h1 id="outfit-title">Outfit Details</h1>
+        </header>
+
+        <div class="outfit-hero" id="outfit-image-container">
+            Loading visual...
+        </div>
+
+        <div class="grid-2">
+            <div>
+                <div class="card mb-1">
+                    <h3>Breakdown</h3>
+                    <p id="outfit-desc" class="mb-1"></p>
+                    <ul id="item-list" style="padding-left: 1.2rem;"></ul>
+                </div>
+
+                <div class="card">
+                    <h3>Scores</h3>
+                    <div id="scores-display"></div>
+                </div>
+            </div>
+
+            <div>
+                <div class="card mb-1">
+                    <h3>Actions</h3>
+                    <button style="width: 100%;" onclick="markAsWorn()" class="mb-1">📅 Mark as Worn Today</button>
+
+                    <h4 class="mt-1">Rate this Outfit</h4>
+                    <div class="rating-stars" id="rating-stars">
+                        <span onclick="rate(1)">☆</span><span onclick="rate(2)">☆</span><span
+                            onclick="rate(3)">☆</span><span onclick="rate(4)">☆</span><span onclick="rate(5)">☆</span>
+                    </div>
+                    <textarea id="feedback" placeholder="Leave feedback..." class="mt-1" rows="3"></textarea>
+                    <button class="secondary mt-1" onclick="submitFeedback()">Submit Feedback</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const outfitId = urlParams.get('id');
+        let currentOutfit = null;
+        let currentUser = null;
+
+        requireAuth().then(user => {
+            currentUser = user;
+            loadOutfit();
+        });
+
+        async function loadOutfit() {
+            if (!outfitId) return;
+            try {
+                currentOutfit = await databases.getDocument(DB_ID, COLLECTIONS.GENERATED_OUTFITS, outfitId);
+
+                document.getElementById('outfit-title').textContent = currentOutfit.outfitName;
+                document.getElementById('outfit-desc').textContent = currentOutfit.explanationShort;
+
+                // Image
+                const imgContainer = document.getElementById('outfit-image-container');
+                if (currentOutfit.aiImageUrl) {
+                    imgContainer.innerHTML = `<img src="${currentOutfit.aiImageUrl}" alt="AI Generated Outfit">`;
+                } else {
+                    imgContainer.textContent = "No AI visualization generated.";
+                }
+
+                // Items
+                if (currentOutfit.allItemIds && currentOutfit.allItemIds.length > 0) {
+                    const list = document.getElementById('item-list');
+                    // In a real app we would do a bulk fetch or map, for now simple loop
+                    for (const id of currentOutfit.allItemIds) {
+                        try {
+                            const item = await databases.getDocument(DB_ID, COLLECTIONS.WARDROBE_ITEMS, id);
+                            const li = document.createElement('li');
+                            li.textContent = `${item.itemName || item.category} (${item.colorPrimary})`;
+                            list.appendChild(li);
+                        } catch (e) {
+                            console.log('Item not found', id);
+                        }
+                    }
+                }
+
+                // Scores
+                document.getElementById('scores-display').innerHTML = `
+                    <p>Color Harmony: ${currentOutfit.colorHarmonyScore}/10</p>
+                    <p>Season Fit: ${currentOutfit.seasonFitScore}/10</p>
+                    <p>Overall: ${currentOutfit.overallScore}/10 (${currentOutfit.ratingLabel})</p>
+                `;
+
+                // Existing Rating
+                if (currentOutfit.starRating) {
+                    renderStars(currentOutfit.starRating);
+                }
+
+            } catch (err) {
+                console.error(err);
+                alert("Error loading outfit");
+            }
+        }
+
+        async function markAsWorn() {
+            if (!currentOutfit) return;
+            try {
+                await databases.createDocument(
+                    DB_ID,
+                    COLLECTIONS.OUTFIT_HISTORY,
+                    Appwrite.ID.unique(),
+                    {
+                        userId: currentUser.$id,
+                        wornDate: new Date().toISOString(),
+                        outfitId: currentOutfit.$id,
+                        wasGeneratedOutfit: true,
+                        itemIdsWorn: currentOutfit.allItemIds,
+                        seasonContext: currentOutfit.seasonMatch,
+                        weatherContext: currentOutfit.weatherMatch,
+                        userSatisfaction: currentOutfit.starRating || 0,
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString()
+                    }
+                );
+                alert('Marked as worn!');
+            } catch (err) {
+                console.error(err);
+                alert('Error: ' + err.message);
+            }
+        }
+
+        async function rate(score) {
+            if (!currentOutfit) return;
+            try {
+                await databases.updateDocument(
+                    DB_ID,
+                    COLLECTIONS.GENERATED_OUTFITS,
+                    outfitId,
+                    { starRating: score }
+                );
+                currentOutfit.starRating = score;
+                renderStars(score);
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        function renderStars(score) {
+            const stars = document.getElementById('rating-stars').children;
+            for (let i = 0; i < 5; i++) {
+                stars[i].textContent = i < score ? '★' : '☆';
+            }
+        }
+
+        async function submitFeedback() {
+            const feedback = document.getElementById('feedback').value;
+            try {
+                await databases.updateDocument(
+                    DB_ID,
+                    COLLECTIONS.GENERATED_OUTFITS,
+                    outfitId,
+                    { userFeedback: feedback }
+                );
+                alert('Feedback saved.');
+            } catch (err) {
+                console.error(err);
+            }
+        }
+    </script>
+</body>
+
+</html>

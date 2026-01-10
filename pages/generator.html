@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Outfit Generator - What I Own</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@16.0.2"></script>
+    <script src="../js/app.js"></script>
+</head>
+
+<body>
+    <div class="container" style="max-width: 600px;">
+        <header class="mb-1 mt-1">
+            <h1>Generate Outfit</h1>
+        </header>
+
+        <div class="card">
+            <form id="generate-form">
+                <div class="form-group grid-2">
+                    <div>
+                        <label for="season">Season</label>
+                        <select id="season" required>
+                            <option value="summer">Summer</option>
+                            <option value="winter">Winter</option>
+                            <option value="autumn">Autumn</option>
+                            <option value="spring">Spring</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="occasion">Occasion</label>
+                        <select id="occasion" required>
+                            <option value="casual">Casual</option>
+                            <option value="work">Work</option>
+                            <option value="date">Date</option>
+                            <option value="party">Party</option>
+                            <option value="formal_event">Formal</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group grid-2">
+                    <div>
+                        <label for="temp">Temperature</label>
+                        <input type="number" id="temp" placeholder="25">
+                    </div>
+                    <div>
+                        <label for="style">Style Preference</label>
+                        <select id="style" required>
+                            <option value="simple">Simple</option>
+                            <option value="layered">Layered</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="mood">Color Mood</label>
+                    <select id="mood">
+                        <option value="neutral">Neutral</option>
+                        <option value="bold">Bold</option>
+                        <option value="monochrome">Monochrome</option>
+                        <option value="colorful">Colorful</option>
+                    </select>
+                </div>
+
+                <button type="submit">✨ Generate Outfit</button>
+                <a href="dashboard.html"><button type="button" class="secondary">Cancel</button></a>
+            </form>
+            <div id="status" class="mt-1"></div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('generate-form');
+        const status = document.getElementById('status');
+        let currentUser = null;
+
+        requireAuth().then(user => { currentUser = user; });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            status.textContent = 'Analyzing wardrobe...';
+
+            const season = document.getElementById('season').value;
+            const occasion = document.getElementById('occasion').value;
+            const style = document.getElementById('style').value;
+            const mood = document.getElementById('mood').value;
+
+            try {
+                // 1. Save Outfit Context
+                const contextId = Appwrite.ID.unique();
+                await databases.createDocument(
+                    DB_ID,
+                    COLLECTIONS.OUTFIT_CONTEXTS,
+                    contextId,
+                    {
+                        userId: currentUser.$id,
+                        seasonInput: season,
+                        occasionType: occasion,
+                        stylePreference: style,
+                        colorMoodPreference: mood,
+                        createdAt: new Date().toISOString()
+                    }
+                );
+
+                // 2. Select Items (SIMULATED LOGIC for Wireframe)
+                // Real app would have complex algo here. We just pick random top/bottom/shoes.
+                status.textContent = 'Selecting items...';
+
+                const tops = await databases.listDocuments(DB_ID, COLLECTIONS.WARDROBE_ITEMS, [
+                    Appwrite.Query.equal('userId', currentUser.$id),
+                    Appwrite.Query.contains('category', ['shirt', 'tshirt', 'jacket', 'hoodie', 'sweater'])
+                ]);
+                const bottoms = await databases.listDocuments(DB_ID, COLLECTIONS.WARDROBE_ITEMS, [
+                    Appwrite.Query.equal('userId', currentUser.$id),
+                    Appwrite.Query.contains('category', ['pant', 'jeans', 'shorts', 'skirt'])
+                ]);
+                const shoes = await databases.listDocuments(DB_ID, COLLECTIONS.WARDROBE_ITEMS, [
+                    Appwrite.Query.equal('userId', currentUser.$id),
+                    Appwrite.Query.contains('category', ['shoes', 'sneakers', 'boots'])
+                ]);
+
+                if (tops.total === 0 || bottoms.total === 0 || shoes.total === 0) {
+                    throw new Error('Not enough items in wardrobe to generate outfit (Need top, bottom, and shoes).');
+                }
+
+                // Random pick
+                const selectedTop = tops.documents[Math.floor(Math.random() * tops.total)];
+                const selectedBottom = bottoms.documents[Math.floor(Math.random() * bottoms.total)];
+                const selectedShoes = shoes.documents[Math.floor(Math.random() * shoes.total)];
+
+                const allItems = [selectedTop.$id, selectedBottom.$id, selectedShoes.$id];
+                const itemNames = [selectedTop.itemName, selectedBottom.itemName, selectedShoes.itemName].join(', ');
+
+                // 3. Create Placeholder Output
+                const outfitId = Appwrite.ID.unique();
+                status.textContent = 'Designing outfit...';
+
+                const outfitDoc = await databases.createDocument(
+                    DB_ID,
+                    COLLECTIONS.GENERATED_OUTFITS,
+                    outfitId,
+                    {
+                        userId: currentUser.$id,
+                        contextId: contextId,
+                        outfitName: `Outfit for ${occasion}`,
+                        outfitNumber: Math.floor(Date.now() / 1000), // temp
+                        allItemIds: allItems,
+                        shoesItemId: selectedShoes.$id, // required in schema
+                        totalPieces: 3,
+                        colorsUsed: [selectedTop.colorPrimary, selectedBottom.colorPrimary],
+                        colorCount: 2,
+                        dominantColor: selectedTop.colorPrimary,
+                        seasonMatch: season,
+                        weatherMatch: [season],
+                        styleType: [style],
+                        layerCount: 1,
+                        warmthTotal: 5,
+                        seasonFitScore: 8,
+                        weatherFitScore: 8,
+                        colorHarmonyScore: 9,
+                        styleConsistencyScore: 8,
+                        practicalityScore: 9,
+                        overallScore: 9,
+                        starRating: 0,
+                        ratingLabel: 'balanced',
+                        explanationShort: `A ${style} look for ${season}, featuring ${itemNames}.`,
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString()
+                    }
+                );
+
+                // 4. Call AI Function
+                status.textContent = 'Visualizing (AI generation)...';
+                const prompt = `Fashion flat lay of ${selectedTop.color || ''} ${selectedTop.category}, ${selectedBottom.color || ''} ${selectedBottom.category}, and ${selectedShoes.color || ''} ${selectedShoes.category}. Minimalist background. High quality.`;
+
+                try {
+                    const execution = await functions.createExecution(
+                        '6960ee7400025996b8d9', // GenerateOutfitImage Function ID
+                        JSON.stringify({ prompt: prompt }),
+                        false, // async
+                        '/', // path
+                        'POST'
+                    );
+
+                    const response = JSON.parse(execution.responseBody);
+
+                    if (response.success && response.imageUrl) {
+                        // Update doc with image
+                        await databases.updateDocument(
+                            DB_ID,
+                            COLLECTIONS.GENERATED_OUTFITS,
+                            outfitId,
+                            {
+                                aiImageUrl: response.imageUrl,
+                                aiImageFileId: response.fileId,
+                                updatedAt: new Date().toISOString()
+                            }
+                        );
+                    } else {
+                        console.warn('AI generation failed or incomplete', response);
+                    }
+
+                } catch (fnErr) {
+                    console.error('Function execution error', fnErr);
+                    // Continue anyway to show the outfit text
+                }
+
+                window.location.href = `outfit-details.html?id=${outfitId}`;
+
+            } catch (err) {
+                console.error(err);
+                status.textContent = 'Error: ' + err.message;
+            }
+        });
+    </script>
+</body>
+
+</html>

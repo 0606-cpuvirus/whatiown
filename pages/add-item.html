@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Item - What I Own</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@16.0.2"></script>
+    <script src="../js/app.js"></script>
+</head>
+
+<body>
+    <div class="container" style="max-width: 600px;">
+        <header class="mb-1 mt-1">
+            <h1>Add New Item</h1>
+        </header>
+
+        <div class="card">
+            <form id="add-item-form">
+                <!-- Image Upload -->
+                <div class="form-group">
+                    <label for="image">Item Image</label>
+                    <input type="file" id="image" accept="image/*" required>
+                </div>
+
+                <!-- Basic Info -->
+                <div class="form-group grid-2">
+                    <div>
+                        <label for="name">Item Name</label>
+                        <input type="text" id="name" placeholder="e.g. Black Leather Jacket">
+                    </div>
+                    <div>
+                        <label for="brand">Brand</label>
+                        <input type="text" id="brand">
+                    </div>
+                </div>
+
+                <!-- Categories -->
+                <div class="form-group grid-2">
+                    <div>
+                        <label for="category">Category</label>
+                        <select id="category" required>
+                            <option value="">Select...</option>
+                            <option value="shirt">Shirt</option>
+                            <option value="tshirt">T-Shirt</option>
+                            <option value="pant">Pant</option>
+                            <option value="jeans">Jeans</option>
+                            <option value="shorts">Shorts</option>
+                            <option value="jacket">Jacket</option>
+                            <option value="coat">Coat</option>
+                            <option value="sweater">Sweater</option>
+                            <option value="hoodie">Hoodie</option>
+                            <option value="shoes">Shoes</option>
+                            <option value="sneakers">Sneakers</option>
+                            <option value="boots">Boots</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="warmth">Warmth Level</label>
+                        <select id="warmth" required>
+                            <option value="light">Light</option>
+                            <option value="medium">Medium</option>
+                            <option value="heavy">Heavy</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Details -->
+                <div class="form-group grid-3">
+                    <div>
+                        <label for="layer">Layer Type</label>
+                        <select id="layer" required>
+                            <option value="inner">Inner</option>
+                            <option value="mid">Mid</option>
+                            <option value="outer">Outer</option>
+                            <option value="standalone">Standalone</option>
+                            <option value="accessory">Accessory</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="fit">Fit Type</label>
+                        <select id="fit">
+                            <option value="regular">Regular</option>
+                            <option value="tight">Tight</option>
+                            <option value="slim">Slim</option>
+                            <option value="loose">Loose</option>
+                            <option value="oversized">Oversized</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="color">Primary Color</label>
+                        <input type="text" id="color" placeholder="e.g. Black" required>
+                    </div>
+                </div>
+
+                <button type="submit">Add Item</button>
+                <a href="wardrobe.html"><button type="button" class="secondary">Cancel</button></a>
+            </form>
+            <div id="upload-status" class="mt-1"></div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('add-item-form');
+        const status = document.getElementById('upload-status');
+        let currentUser = null;
+
+        requireAuth().then(user => { currentUser = user; });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            status.textContent = 'Uploading...';
+
+            const fileInput = document.getElementById('image');
+            const file = fileInput.files[0];
+
+            try {
+                // 1. Upload Image
+                const upload = await storage.createFile(BUCKET_ID, Appwrite.ID.unique(), file);
+                const fileId = upload.$id;
+
+                // 2. Generate URLs (preview)
+                const viewUrl = storage.getFileView(BUCKET_ID, fileId).toString();
+                const thumbUrl = storage.getFilePreview(BUCKET_ID, fileId, 300, 300).toString();
+
+                // 3. Create Database Record
+                await databases.createDocument(
+                    DB_ID,
+                    COLLECTIONS.WARDROBE_ITEMS,
+                    Appwrite.ID.unique(),
+                    {
+                        userId: currentUser.$id,
+                        itemName: document.getElementById('name').value,
+                        brand: document.getElementById('brand').value,
+                        category: document.getElementById('category').value,
+                        warmthLevel: document.getElementById('warmth').value,
+                        layerType: document.getElementById('layer').value,
+                        fitType: document.getElementById('fit').value,
+                        colorPrimary: document.getElementById('color').value,
+                        imageFileId: fileId,
+                        imageUrl: viewUrl,
+                        imageThumbnailUrl: thumbUrl,
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString()
+                    }
+                );
+
+                status.textContent = 'Item added successfully!';
+                setTimeout(() => window.location.href = 'wardrobe.html', 1000);
+
+            } catch (err) {
+                console.error(err);
+                status.textContent = 'Error: ' + err.message;
+            }
+        });
+    </script>
+</body>
+
+</html>

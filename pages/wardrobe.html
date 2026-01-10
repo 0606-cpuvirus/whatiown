@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Wardrobe - What I Own</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@16.0.2"></script>
+    <script src="../js/app.js"></script>
+    <style>
+        .wardrobe-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .wardrobe-item {
+            background: #222;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: transform 0.2s;
+        }
+
+        .wardrobe-item:hover {
+            transform: translateY(-5px);
+        }
+
+        .item-img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            background: #333;
+        }
+
+        .item-info {
+            padding: 1rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header class="flex justify-between mb-1 mt-1">
+            <h1>My Wardrobe</h1>
+            <a href="dashboard.html"><button class="secondary">Back to Dashboard</button></a>
+        </header>
+
+        <div class="card mb-1 flex justify-between">
+            <div class="flex">
+                <select id="filter-category">
+                    <option value="">All Categories</option>
+                    <option value="shirt">Shirt</option>
+                    <option value="pant">Pant</option>
+                    <option value="shoes">Shoes</option>
+                    <option value="jacket">Jacket</option>
+                </select>
+                <select id="filter-layer">
+                    <option value="">All Layers</option>
+                    <option value="inner">Inner</option>
+                    <option value="mid">Mid</option>
+                    <option value="outer">Outer</option>
+                </select>
+            </div>
+            <a href="add-item.html"><button>+ Add Item</button></a>
+        </div>
+
+        <div id="wardrobe-grid" class="wardrobe-grid">
+            Loading wardrobe...
+        </div>
+    </div>
+
+    <script>
+        const grid = document.getElementById('wardrobe-grid');
+        const filterCat = document.getElementById('filter-category');
+        const filterLayer = document.getElementById('filter-layer');
+        let currentUser = null;
+
+        async function loadWardrobe() {
+            grid.innerHTML = 'Loading...';
+            try {
+                const queries = [
+                    Appwrite.Query.equal('userId', currentUser.$id),
+                    Appwrite.Query.orderDesc('createdAt')
+                ];
+
+                if (filterCat.value) queries.push(Appwrite.Query.equal('category', filterCat.value));
+                if (filterLayer.value) queries.push(Appwrite.Query.equal('layerType', filterLayer.value));
+
+                const result = await databases.listDocuments(DB_ID, COLLECTIONS.WARDROBE_ITEMS, queries);
+
+                if (result.documents.length === 0) {
+                    grid.innerHTML = '<p>No items found.</p>';
+                    return;
+                }
+
+                grid.innerHTML = result.documents.map(item => {
+                    let imgUrl = item.imageThumbnailUrl || '';
+                    if (!imgUrl && item.imageFileId) {
+                        try {
+                            imgUrl = storage.getFilePreview(BUCKET_ID, item.imageFileId, 300, 300).toString();
+                        } catch (e) { console.error('Image URL gen error', e); }
+                    }
+
+                    return `
+                        <div class="wardrobe-item">
+                            <a href="item-details.html?id=${item.$id}" style="color: inherit; text-decoration: none;">
+                                <img src="${imgUrl || 'https://via.placeholder.com/300x300?text=No+Image'}" class="item-img" loading="lazy">
+                                <div class="item-info">
+                                    <h3>${item.itemName || item.category}</h3>
+                                    <p style="color: #888; font-size: 0.9rem;">${item.subCategory || item.brand || ''}</p>
+                                </div>
+                            </a>
+                        </div>
+                    `;
+                }).join('');
+
+            } catch (err) {
+                console.error(err);
+                grid.innerHTML = 'Error loading wardrobe.';
+            }
+        }
+
+        requireAuth().then(user => {
+            currentUser = user;
+            loadWardrobe();
+        });
+
+        filterCat.addEventListener('change', loadWardrobe);
+        filterLayer.addEventListener('change', loadWardrobe);
+    </script>
+</body>
+
+</html>

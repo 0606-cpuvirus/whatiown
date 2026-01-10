@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Preferences - What I Own</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@16.0.2"></script>
+    <script src="../js/app.js"></script>
+</head>
+
+<body>
+    <div class="container" style="max-width: 600px;">
+        <header class="mb-1 mt-1">
+            <h1>Style Preferences</h1>
+        </header>
+
+        <div class="card">
+            <form id="pref-form">
+                <div class="form-group grid-2">
+                    <div>
+                        <label for="fav-colors">Favorite Colors (comma sep)</label>
+                        <input type="text" id="fav-colors" placeholder="Black, Red, Navy">
+                    </div>
+                    <div>
+                        <label for="dis-colors">Disliked Colors (comma sep)</label>
+                        <input type="text" id="dis-colors" placeholder="Yellow, Brown">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="fits">Preferred Fit Types</label>
+                    <input type="text" id="fits" placeholder="e.g. Slim, Regular">
+                </div>
+
+                <button type="submit">Save Preferences</button>
+                <a href="dashboard.html"><button type="button" class="secondary">Cancel</button></a>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null;
+        let prefId = null; // usually same as userId
+
+        requireAuth().then(async (user) => {
+            currentUser = user;
+            try {
+                const prefs = await databases.getDocument(DB_ID, COLLECTIONS.USER_PREFERENCES, user.$id);
+                prefId = prefs.$id;
+
+                document.getElementById('fav-colors').value = prefs.favoriteColors.join(', ');
+                document.getElementById('dis-colors').value = prefs.dislikedColors.join(', ');
+                document.getElementById('fits').value = prefs.preferredFitTypes.join(', ');
+
+            } catch (err) {
+                console.error("No prefs found creating new not handled for simplicity", err);
+            }
+        });
+
+        document.getElementById('pref-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const favCalls = document.getElementById('fav-colors').value.split(',').map(s => s.trim()).filter(s => s);
+            const disCalls = document.getElementById('dis-colors').value.split(',').map(s => s.trim()).filter(s => s);
+            const fits = document.getElementById('fits').value.split(',').map(s => s.trim()).filter(s => s);
+
+            try {
+                await databases.updateDocument(
+                    DB_ID,
+                    COLLECTIONS.USER_PREFERENCES,
+                    prefId || currentUser.$id,
+                    {
+                        favoriteColors: favCalls,
+                        dislikedColors: disCalls,
+                        preferredFitTypes: fits,
+                        updatedAt: new Date().toISOString()
+                    }
+                );
+                alert('Preferences saved!');
+                window.location.href = 'dashboard.html';
+
+            } catch (err) {
+                console.error(err);
+                alert('Error: ' + err.message);
+            }
+        });
+    </script>
+</body>
+
+</html>
