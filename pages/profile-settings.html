@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>What I Own - Profile</title>
+    <link rel="stylesheet" href="../css/style.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@14.0.1"></script>
+    <script src="../js/app.js"></script>
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="logo">
+            <h3>What I Own</h3>
+        </div>
+        <div class="nav-links">
+            <a href="dashboard.html">Dashboard</a>
+            <a href="wardrobe.html">Wardrobe</a>
+            <a href="add-item.html">Add Item</a>
+            <a href="generate-outfit.html">Generate</a>
+            <a href="profile-settings.html" class="active">Profile</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h1>Profile Settings</h1>
+
+        <div class="card" style="max-width: 600px; margin: 0 auto;">
+            <div id="alert-box" class="hidden"></div>
+
+            <form id="profile-form">
+                <div class="form-group">
+                    <label>Display Name</label>
+                    <input type="text" id="profile-name" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Email (Read Only)</label>
+                    <input type="email" id="profile-email" disabled>
+                </div>
+
+                <div class="form-group">
+                    <label>Gender</label>
+                    <select id="profile-gender">
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Default Location</label>
+                    <input type="text" id="profile-location" placeholder="e.g. New York">
+                </div>
+
+                <button type="submit" id="save-btn" style="margin-top: 20px;">Save Changes</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const form = document.getElementById('profile-form');
+            const alertBox = document.getElementById('alert-box');
+
+            // Initialize
+            const checkAppwrite = setInterval(async () => {
+                if (window.appwriteService && window.appwriteInitialized) {
+                    clearInterval(checkAppwrite);
+                    loadProfile();
+                } else if (window.appwriteService) {
+                    clearInterval(checkAppwrite);
+                    loadProfile();
+                }
+            }, 100);
+
+            async function loadProfile() {
+                try {
+                    const user = await window.appwriteService.getCurrentUser();
+                    if (!user) {
+                        window.location.href = '../index.html';
+                        return;
+                    }
+
+                    // Fill basic account info
+                    document.getElementById('profile-name').value = user.name;
+                    document.getElementById('profile-email').value = user.email;
+
+                    // Fetch extended profile from database
+                    try {
+                        const profile = await window.appwriteService.getUserProfile(user.$id);
+                        document.getElementById('profile-gender').value = profile.gender;
+                        document.getElementById('profile-location').value = profile.defaultLocation || '';
+                    } catch (e) {
+                        // Profile might not exist if only account created?
+                        // Schema says profile is created on signup (in logic).
+                        console.log("Profile load warning:", e);
+                    }
+
+                } catch (error) {
+                    console.error("Load error:", error);
+                }
+            }
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const btn = document.getElementById('save-btn');
+
+                try {
+                    btn.disabled = true;
+                    btn.innerText = "Saving...";
+
+                    const user = await window.appwriteService.getCurrentUser();
+                    const name = document.getElementById('profile-name').value;
+                    const gender = document.getElementById('profile-gender').value;
+                    const location = document.getElementById('profile-location').value;
+
+                    // Update Account Name
+                    if (name !== user.name) {
+                        await window.appwriteService.account.updateName(name);
+                    }
+
+                    // Update Database Profile
+                    const data = {
+                        displayName: name,
+                        gender: gender,
+                        defaultLocation: location
+                    };
+                    await window.appwriteService.updateUserProfile(user.$id, data);
+
+                    showAlert("Profile updated!", "success-message");
+
+                } catch (error) {
+                    console.error(error);
+                    showAlert(error.message, "error-message");
+                } finally {
+                    btn.disabled = false;
+                    btn.innerText = "Save Changes";
+                }
+            });
+
+            function showAlert(msg, className) {
+                alertBox.className = className;
+                alertBox.innerText = msg;
+                alertBox.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+
+</html>

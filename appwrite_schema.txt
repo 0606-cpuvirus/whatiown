@@ -1,0 +1,200 @@
+Connection Details
+
+Endpoint: https://sgp.cloud.appwrite.io/v1
+Project ID: 695fba17000e4455e53d
+Database ID: 695fba61000840feb7f5 (whatiown)
+Bucket ID: wardrobe_assets
+Model: stabilityai/stable-diffusion-xl-base-1.0
+
+Collections Overview
+1. USER_PROFILES (user_profiles)
+Attributes:
+
+userId (string, 36, required, unique index)
+displayName (string, 100, required)
+email (string, 255, required, unique index)
+gender (enum: male/female/other, required)
+defaultLocation (string, 100)
+createdAt, updatedAt (datetime, required)
+
+2. WARDROBE_ITEMS (wardrobe_items)
+Attributes:
+
+userId (string, 36, required, indexed)
+itemName (string, 150)
+category (enum, required): shirt/tshirt/pant/jeans/shorts/jacket/coat/sweater/hoodie/dress/skirt/shoes/boots/sneakers/belt/hat/scarf/bag/watch/sunglasses
+subCategory (string, 50)
+brand (string, 100)
+colorPrimary (string, 30, required), colorSecondary (string, 30), colorAccent (string, 30)
+colorHexPrimary (string, 7), colorHexSecondary (string, 7)
+fabricMaterial (string[], 50), fabricTexture (enum): smooth/rough/soft/stiff/stretchy
+warmthLevel (enum, required): light/medium/heavy
+layerType (enum, required): inner/mid/outer/standalone/accessory
+fitType (enum, default: regular): tight/slim/regular/loose/oversized
+sleeveLength (enum): sleeveless/short/three_quarter/long
+necklineType (enum): crew/v_neck/collar/turtleneck/hood
+lengthType (enum): short/knee/midi/ankle/long
+imageFileId (string, 36), imageUrl (string, 500), imageThumbnailUrl (string, 500)
+purchaseDate (datetime), purchasePrice (double), purchaseCurrency (string, 3)
+tags (string[], 50), notes (string, 500)
+lastWornDate (datetime), createdAt, updatedAt (datetime, required)
+Indexes: idx_userId, idx_userId_category, idx_userId_layerType
+
+3. OUTFIT_CONTEXTS (outfit_contexts)
+Attributes:
+
+userId (string, 36, required, indexed)
+seasonInput (enum, required): summer/winter/autumn/spring
+temperatureValue (double), temperatureUnit (enum): celsius/fahrenheit
+stylePreference (enum, required): simple/layered
+occasionType (enum, default: casual): casual/work/date/party/sport/formal_event/travel/home
+colorMoodPreference (enum): neutral/bold/monochrome/colorful
+avoidColors (string[], 30)
+mustIncludeItemIds (string[], 36), excludeItemIds (string[], 36)
+locationName (string, 100)
+timeOfDay (enum): morning/afternoon/evening/night
+indoorOutdoor (enum): indoor/outdoor/both
+activityLevel (enum): sedentary/light/moderate/active
+createdAt (datetime, required)
+Indexes: idx_userId, idx_userId_createdAt
+
+4. GENERATED_OUTFITS (generated_outfits)
+Attributes:
+
+userId (string, 36, required, indexed)
+contextId (string, 36, required, indexed)
+outfitName (string, 150), outfitNumber (integer, required)
+innerLayerItemId, midLayerItemId, outerLayerItemId, bottomItemId (string, 36)
+shoesItemId (string, 36, required)
+accessory1ItemId, accessory2ItemId, accessory3ItemId (string, 36)
+allItemIds (string[], 36, required)
+totalPieces (integer, required)
+colorsUsed (string[], 30, required), colorCount (integer, required)
+dominantColor (string, 30, required)
+seasonMatch (string, 20, required)
+weatherMatch (string[], 20, required)
+styleType (string[], 30, required)
+layerCount (integer, required), warmthTotal (integer, required)
+seasonFitScore, weatherFitScore, colorHarmonyScore, styleConsistencyScore, practicalityScore, overallScore (integer, required)
+starRating (integer, required)
+ratingLabel (enum, required): safe/balanced/bold/perfect
+explanationShort (string, 250, required)
+explanationDetailed (string, 1000)
+strengthsList, weaknessesList, suggestionsList (string[], 100)
+wornDate (datetime), userRating (integer), userFeedback (string, 500)
+aiImageFileId (string, 200), aiImageUrl (string, 200)
+createdAt, updatedAt (datetime, required)
+Indexes: idx_userId, idx_contextId
+
+5. OUTFIT_HISTORY (outfit_history)
+Attributes:
+
+userId (string, 36, required, indexed)
+wornDate (datetime, required)
+outfitId (string, 36), wasGeneratedOutfit (boolean, required)
+itemIdsWorn (string[], 36, required)
+seasonContext (string, 20, required)
+weatherContext (string[], 20, required)
+occasionType (string, 30)
+userSatisfaction, comfortLevel (integer)
+notes (string, 500)
+photoFileId (string, 36), photoUrl (string, 500)
+createdAt, updatedAt (datetime, required)
+Indexes: idx_userId, idx_userId_wornDate
+
+6. STYLING_RULES (styling_rules)
+Attributes:
+
+ruleName (string, 100, required)
+ruleType (enum, required, indexed): color/layer/weather/season/style/combination
+ruleCategory (enum, required): mandatory/recommended/preference/restriction
+applicableSeasons, applicableWeather, applicableSkinTones, applicableGenders (string[], 20)
+conditionField (string, 100), conditionOperator (enum): equals/greater_than/less_than/contains/not_contains
+conditionValue (string, 100)
+ruleAction (enum, required): allow/disallow/require/prefer/suggest
+targetField (string, 100), targetValues (string[], 100)
+conflictsWith, mustPairWith (string[], 50)
+colorPalette (string[], 30)
+maxLayers, minLayers, maxColors (integer)
+createdAt, updatedAt (datetime, required)
+Indexes: idx_ruleType
+
+7. USER_PREFERENCES (user_preferences)
+Attributes:
+
+userId (string, 36, required, unique index)
+favoriteColors, dislikedColors (string[], 30)
+favoriteCategories, avoidCategories (string[], 30)
+preferredFitTypes (string[], 30)
+avoidPatterns (string[], 30)
+createdAt, updatedAt (datetime, required)
+Indexes: idx_userId (unique)
+
+8. WARDROBE_STATISTICS (wardrobe_statistics)
+Attributes:
+
+userId (string, 36, required, indexed)
+periodType (enum, required): weekly/monthly/yearly/all_time
+periodStart, periodEnd (datetime, required)
+mostWornItems, leastWornItems, neverWornItems, favoriteItems (string[], 36, required)
+mostCommonColorCombo (string[], 30)
+mostCommonOccasion (string, 30)
+wardrobeGapsDetected, underutilizedCategories (string[], 50)
+recommendedPurchases (string[], 100)
+calculatedAt, createdAt (datetime, required)
+Indexes: idx_userId, idx_userId_periodType
+
+9. COLOR_HARMONY_RULES (color_harmony_rules)
+Attributes:
+
+primaryColor (string, 30, required, indexed)
+skinTone (enum): warm/cool/neutral/all
+season (enum): summer/winter/autumn/spring/all
+matchingColors (string[], 30, required)
+accentColors, avoidColors (string[], 30)
+neutralsAllowed (string[], 30, required)
+harmonyType (enum, required): complementary/analogous/triadic/monochromatic/neutral
+colorMood (string, 50)
+formalityLevel (enum, default: any): casual/semi_formal/formal/any
+createdAt, updatedAt (datetime, required)
+Indexes: idx_primaryColor
+
+10. APP_SETTINGS (app_settings)
+Attributes:
+
+settingKey (string, 100, required, unique index)
+settingValue (string, 2000, required)
+settingType (enum, required): string/number/boolean/json/array
+category (string, 50, required, indexed)
+description (string, 500)
+lastModifiedBy (string, 36)
+createdAt, updatedAt (datetime, required)
+Indexes: idx_settingKey (unique), idx_category
+
+Storage
+BUCKET: wardrobe_assets
+
+Max File Size: 50MB
+Compression: gzip
+Encryption: true
+Antivirus: true
+Transformations: true
+File Security: enabled
+
+Files (3):
+
+695fd5e9001c74d4f27e - ferrari-458-carbon-7680x4320-24986 (1).jpg (3.6MB)
+695fd97e001615699c6a - ferrari-458-carbon-7680x4320-24986 (1).jpg (3.6MB)
+695fdab8003436317077 - full-moon-forest-night-dark-starry-sky-5k-8k-7952x5304-1684.jpg (9MB)
+
+Functions
+generateOutfitImage (6960ee7400025996b8d9)
+
+Runtime: node-22
+Timeout: 15s
+Specification: s-0.5vcpu-512mb
+Entry: src/main.js
+Status: ready
+Variables: HF_TOKEN=
+Repository: github.com/0606-cpuvirus/generateOutfitImage
+Branch: main

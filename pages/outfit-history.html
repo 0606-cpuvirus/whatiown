@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>What I Own - Outfit History</title>
+    <link rel="stylesheet" href="../css/style.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@14.0.1"></script>
+    <script src="../js/app.js"></script>
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="logo">
+            <h3>What I Own</h3>
+        </div>
+        <div class="nav-links">
+            <a href="dashboard.html">Dashboard</a>
+            <a href="wardrobe.html">Wardrobe</a>
+            <a href="add-item.html">Add Item</a>
+            <a href="generate-outfit.html">Generate</a>
+            <a href="profile-settings.html">Profile</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h1>Outfit History</h1>
+        <p>Your generated looks.</p>
+
+        <div id="history-grid" class="grid">
+            <p>Loading history...</p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const grid = document.getElementById('history-grid');
+
+            // Initialize
+            const checkAppwrite = setInterval(async () => {
+                if (window.appwriteService && window.appwriteInitialized) {
+                    clearInterval(checkAppwrite);
+                    loadHistory();
+                } else if (window.appwriteService) {
+                    clearInterval(checkAppwrite);
+                    loadHistory();
+                }
+            }, 100);
+
+            async function loadHistory() {
+                try {
+                    const user = await window.appwriteService.getCurrentUser();
+                    if (!user) {
+                        window.location.href = '../index.html';
+                        return;
+                    }
+
+                    // Fetch Generated Outfits
+                    const result = await window.appwriteService.databases.listDocuments(
+                        '695fba61000840feb7f5', // DB ID
+                        'generated_outfits',   // Collection ID from schema
+                        [
+                            window.Appwrite.Query.equal('userId', user.$id),
+                            window.Appwrite.Query.orderDesc('createdAt'),
+                            window.Appwrite.Query.limit(20)
+                        ]
+                    );
+
+                    if (result.documents.length === 0) {
+                        grid.innerHTML = '<p>No outfits generated yet. <a href="generate-outfit.html">Generate one!</a></p>';
+                        return;
+                    }
+
+                    grid.innerHTML = '';
+                    result.documents.forEach(outfit => {
+                        const card = document.createElement('div');
+                        card.className = 'card';
+
+                        let imgHtml = '';
+                        if (outfit.aiImageUrl) {
+                            imgHtml = `<img src="${outfit.aiImageUrl}" alt="AI Outfit">`;
+                        } else {
+                            // Placeholder if standard generation without visualization
+                            // Or show items grid? For wireframe, simple placeholdler.
+                            imgHtml = `<div style="height: 200px; background: #222; display: flex; align-items: center; justify-content: center; color: #666;">No Visualization</div>`;
+                        }
+
+                        card.innerHTML = `
+                            ${imgHtml}
+                            <h4>${outfit.outfitName || 'Outfit #' + outfit.outfitNumber}</h4>
+                            <p>${outfit.explanationShort || ''}</p>
+                            <small>${new Date(outfit.createdAt).toLocaleDateString()}</small>
+                            <div style="margin-top: 10px;">
+                                <span style="background: var(--accent-color); color:black; padding: 2px 5px; border-radius: 4px; font-size: 0.8em;">${outfit.ratingLabel || 'N/A'}</span>
+                            </div>
+                        `;
+                        grid.appendChild(card);
+                    });
+
+                } catch (error) {
+                    console.error("Error loading history:", error);
+                    grid.innerHTML = `<p class="error-message">Error loading history: ${error.message}</p>`;
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>

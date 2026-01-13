@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>What I Own - Add Item</title>
+    <link rel="stylesheet" href="../css/style.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@14.0.1"></script>
+    <script src="../js/app.js"></script>
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="logo">
+            <h3>What I Own</h3>
+        </div>
+        <div class="nav-links">
+            <a href="dashboard.html">Dashboard</a>
+            <a href="wardrobe.html">Wardrobe</a>
+            <a href="add-item.html" class="active">Add Item</a>
+            <a href="generate-outfit.html">Generate</a>
+            <a href="profile-settings.html">Profile</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h1>Add New Item</h1>
+
+        <div class="card" style="max-width: 600px; margin: 0 auto;">
+            <div id="alert-box" class="hidden"></div>
+
+            <form id="add-item-form">
+                <!-- Image Upload -->
+                <div class="form-group">
+                    <label>Item Image</label>
+                    <input type="file" id="item-image" accept="image/*" required>
+                    <div id="image-preview" style="margin-top: 10px; display: none;">
+                        <img src="" style="width: 100%; max-height: 300px; object-fit: contain;">
+                    </div>
+                </div>
+
+                <!-- Basic Info -->
+                <div class="form-group">
+                    <label>Item Name</label>
+                    <input type="text" id="item-name" placeholder="e.g. Navy Blue Blazer" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Category</label>
+                    <select id="item-category" required>
+                        <option value="">Select Category</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Primary Color (Hex)</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="color" id="item-color-hex" value="#000000" style="width: 50px;">
+                        <input type="text" id="item-color-name" placeholder="Color Name (e.g. Black)" required
+                            style="flex: 1;">
+                    </div>
+                </div>
+
+                <!-- Attributes -->
+                <div class="form-group">
+                    <label>Warmth Level</label>
+                    <select id="item-warmth" required>
+                        <option value="">Select Warmth</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Layer Type</label>
+                    <select id="item-layer" required>
+                        <option value="">Select Layer</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Fit Type</label>
+                    <select id="item-fit">
+                        <option value="">Select Fit</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Brand (Optional)</label>
+                    <input type="text" id="item-brand" placeholder="Brand Name">
+                </div>
+
+                <button type="submit" id="submit-btn" style="margin-top: 20px;">Add Item</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const form = document.getElementById('add-item-form');
+            const alertBox = document.getElementById('alert-box');
+            const imageInput = document.getElementById('item-image');
+            const imagePreview = document.getElementById('image-preview');
+
+            // Initialize Page
+            const checkAppwrite = setInterval(async () => {
+                if (window.appwriteService && window.appwriteInitialized) {
+                    clearInterval(checkAppwrite);
+                    initForm();
+                } else if (window.appwriteService) {
+                    clearInterval(checkAppwrite);
+                    initForm();
+                }
+            }, 100);
+
+            async function initForm() {
+                // Populate Dropdowns from ENUMS
+                populateSelect('item-category', window.ENUMS.CATEGORIES);
+                populateSelect('item-warmth', window.ENUMS.WARMTH_LEVELS);
+                populateSelect('item-layer', window.ENUMS.LAYER_TYPES);
+                populateSelect('item-fit', window.ENUMS.FIT_TYPES);
+            }
+
+            function populateSelect(id, enumObj) {
+                const select = document.getElementById(id);
+                Object.values(enumObj).forEach(val => {
+                    const opt = document.createElement('option');
+                    opt.value = val;
+                    opt.innerText = val.charAt(0).toUpperCase() + val.slice(1).replace('_', ' ');
+                    select.appendChild(opt);
+                });
+            }
+
+            // Image Preview
+            imageInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        imagePreview.style.display = 'block';
+                        imagePreview.querySelector('img').src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+
+            // Form Submit
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const btn = document.getElementById('submit-btn');
+
+                try {
+                    btn.disabled = true;
+                    btn.innerText = "Uploading & Saving...";
+
+                    const user = await window.appwriteService.getCurrentUser();
+                    if (!user) throw new Error("Not logged in");
+
+                    // 1. Upload Image
+                    const file = imageInput.files[0];
+                    if (!file) throw new Error("Please select an image");
+
+                    const fileId = window.AppwriteService.ID.unique();
+
+                    // We need 'storage' instance directly. 
+                    // app.js exposes 'storage' on AppwriteService instance? Yes.
+                    await window.appwriteService.storage.createFile(
+                        window.COLLECTIONS ? 'wardrobe_assets' : 'wardrobe_assets', // Using hardcoded bucket ID 'wardrobe_assets' from schema/app.js
+                        fileId,
+                        file
+                    );
+
+                    // 2. Create Item
+                    const data = {
+                        userId: user.$id,
+                        itemName: document.getElementById('item-name').value,
+                        category: document.getElementById('item-category').value,
+                        colorPrimary: document.getElementById('item-color-name').value,
+                        colorHexPrimary: document.getElementById('item-color-hex').value,
+                        warmthLevel: document.getElementById('item-warmth').value,
+                        layerType: document.getElementById('item-layer').value,
+                        fitType: document.getElementById('item-fit').value,
+                        brand: document.getElementById('item-brand').value,
+                        imageFileId: fileId,
+                        // Additional schema fields fallback
+                        // We are not setting all fields but required ones + some optionals
+                    };
+
+                    await window.appwriteService.createWardrobeItem(data);
+
+                    showAlert("Item added successfully!", "success-message");
+                    setTimeout(() => {
+                        window.location.href = 'wardrobe.html';
+                    }, 1500);
+
+                } catch (error) {
+                    console.error(error);
+                    showAlert(error.message, "error-message");
+                    btn.disabled = false;
+                    btn.innerText = "Add Item";
+                }
+            });
+
+            function showAlert(msg, className) {
+                alertBox.className = className;
+                alertBox.innerText = msg;
+                alertBox.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+
+</html>

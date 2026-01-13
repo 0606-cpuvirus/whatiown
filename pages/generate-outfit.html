@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>What I Own - Generate</title>
+    <link rel="stylesheet" href="../css/style.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@14.0.1"></script>
+    <script src="../js/app.js"></script>
+    <style>
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            background: transparent;
+            color: var(--text-secondary);
+            border: none;
+            cursor: pointer;
+            font-size: 1.1em;
+        }
+
+        .tab-btn.active {
+            color: var(--accent-color);
+            border-bottom: 2px solid var(--accent-color);
+        }
+
+        .mode-container {
+            display: none;
+        }
+
+        .mode-container.active {
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="logo">
+            <h3>What I Own</h3>
+        </div>
+        <div class="nav-links">
+            <a href="dashboard.html">Dashboard</a>
+            <a href="wardrobe.html">Wardrobe</a>
+            <a href="add-item.html">Add Item</a>
+            <a href="generate-outfit.html" class="active">Generate</a>
+            <a href="profile-settings.html">Profile</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h1>Outfit Generator</h1>
+
+        <div class="tabs">
+            <button class="tab-btn active" data-mode="standard">Standard Mode</button>
+            <button class="tab-btn" data-mode="ai">AI Visualization</button>
+        </div>
+
+        <div id="alert-box" class="hidden"></div>
+        <div id="loading" class="hidden" style="text-align: center; padding: 20px;">
+            <!-- Loader -->
+            <p>Generating...</p>
+        </div>
+
+        <!-- Standard Mode -->
+        <div id="standard" class="mode-container active">
+            <div class="card" style="margin-bottom: 20px;">
+                <h3>Context</h3>
+                <form id="standard-form">
+                    <div class="form-group">
+                        <label>Season</label>
+                        <select id="std-season" required>
+                            <option value="summer">Summer</option>
+                            <option value="winter">Winter</option>
+                            <option value="autumn">Autumn</option>
+                            <option value="spring">Spring</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Occasion</label>
+                        <select id="std-occasion">
+                            <option value="casual">Casual</option>
+                            <option value="work">Work</option>
+                            <option value="party">Party</option>
+                            <option value="formal_event">Formal</option>
+                        </select>
+                    </div>
+                    <button type="submit">Generate Outfit</button>
+                </form>
+            </div>
+
+            <div id="standard-result" class="hidden">
+                <h3>Your Outfit</h3>
+                <div id="outfit-items-grid" class="grid"></div>
+                <button id="save-standard" style="margin-top: 20px;">Save to History</button>
+            </div>
+        </div>
+
+        <!-- AI Mode -->
+        <div id="ai" class="mode-container">
+            <div class="card" style="margin-bottom: 20px;">
+                <h3>AI Visualizer</h3>
+                <p>Describe the look you want to visualize.</p>
+                <form id="ai-form">
+                    <div class="form-group">
+                        <label>Prompt</label>
+                        <textarea id="ai-prompt" rows="3"
+                            placeholder="e.g. A chic summer floral dress layout with straw hat and sandals"
+                            required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Negative Prompt</label>
+                        <input type="text" id="ai-neg-prompt" placeholder="e.g. ugly, blurry, text">
+                    </div>
+                    <button type="submit">Visualize</button>
+                </form>
+            </div>
+
+            <div id="ai-result" class="hidden" style="text-align: center;">
+                <h3>Visualization</h3>
+                <img id="ai-image" src=""
+                    style="max-width: 100%; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">
+                <p id="ai-meta" style="color: #888; margin-top: 10px;"></p>
+                <!-- Download/Save buttons could go here -->
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const loading = document.getElementById('loading');
+            const alertBox = document.getElementById('alert-box');
+
+            // Tabs
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    document.querySelectorAll('.mode-container').forEach(c => c.classList.remove('active'));
+                    document.getElementById(btn.dataset.mode).classList.add('active');
+                });
+            });
+
+            // Init Appwrite
+            const checkAppwrite = setInterval(async () => {
+                if (window.appwriteService && window.appwriteInitialized) {
+                    clearInterval(checkAppwrite);
+                } else if (window.appwriteService) {
+                    clearInterval(checkAppwrite);
+                }
+            }, 100);
+
+            // =========================
+            // Standard Generation
+            // =========================
+            const stdForm = document.getElementById('standard-form');
+            const stdResult = document.getElementById('standard-result');
+            const outfitGrid = document.getElementById('outfit-items-grid');
+            let lastGeneratedData = null;
+
+            stdForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                try {
+                    setLoading(true);
+                    stdResult.classList.add('hidden');
+
+                    const user = await window.appwriteService.getCurrentUser();
+                    if (!user) throw new Error("Please login");
+
+                    const season = document.getElementById('std-season').value;
+                    const occasion = document.getElementById('std-occasion').value;
+
+                    // 1. Create Context
+                    const contextData = {
+                        userId: user.$id,
+                        seasonInput: season,
+                        occasionType: occasion,
+                        stylePreference: 'simple', // default
+                        createdAt: new Date().toISOString()
+                    };
+
+                    const context = await window.appwriteService.createOutfitContext(contextData);
+
+                    // 2. Generate
+                    const result = await window.appwriteService.generateStandardOutfit(context);
+
+                    lastGeneratedData = result.generatedData;
+
+                    // 3. Display
+                    outfitGrid.innerHTML = '';
+                    result.outfitItems.forEach(item => {
+                        const card = document.createElement('div');
+                        card.className = 'card';
+
+                        let imgHtml = '';
+                        if (item.imageUrl) {
+                            imgHtml = `<img src="${item.imageUrl}" alt="${item.itemName}">`;
+                        } else if (item.imageFileId) {
+                            const url = \`https://sgp.cloud.appwrite.io/v1/storage/buckets/wardrobe_assets/files/\${item.imageFileId}/view?project=${window.appwriteService.client.config.project}\`;
+                             imgHtml = `< img src = "${url}" alt = "${item.itemName}" > `;
+                        } else {
+                             imgHtml = `< div style = "height: 200px; background: #333; display: flex; align-items: center; justify-content: center;" > No Image</div > `;
+                        }
+
+                        card.innerHTML = `
+                            ${ imgHtml }
+                            <h4>${item.itemName}</h4>
+                            <p>${item.category}</p>
+                            `;
+                        outfitGrid.appendChild(card);
+                    });
+                    
+                    if (result.outfitItems.length === 0) {
+                        outfitGrid.innerHTML = "<p>No suitable items found in your wardrobe.</p>";
+                    }
+
+                    stdResult.classList.remove('hidden');
+
+                } catch (error) {
+                    showAlert(error.message, 'error-message');
+                } finally {
+                    setLoading(false);
+                }
+            });
+
+            document.getElementById('save-standard').addEventListener('click', async () => {
+                if (!lastGeneratedData) return;
+                try {
+                    const btn = document.getElementById('save-standard');
+                    btn.innerText = "Saving...";
+                    btn.disabled = true;
+
+                    await window.appwriteService.createGeneratedOutfit(lastGeneratedData);
+                    showAlert("Outfit Saved to History!", "success-message");
+
+                } catch (error) {
+                    showAlert("Error Saving: " + error.message, "error-message");
+                }
+                 finally {
+                    document.getElementById('save-standard').innerText = "Save to History";
+                    document.getElementById('save-standard').disabled = false;
+                }
+            });
+
+            // =========================
+            // AI Generation
+            // =========================
+            const aiForm = document.getElementById('ai-form');
+            const aiResult = document.getElementById('ai-result');
+            const aiImage = document.getElementById('ai-image');
+
+            aiForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                try {
+                    setLoading(true);
+                    aiResult.classList.add('hidden');
+
+                    const prompt = document.getElementById('ai-prompt').value;
+                    const neg = document.getElementById('ai-neg-prompt').value;
+
+                    const result = await window.appwriteService.generateOutfitImage(prompt, neg);
+                    
+                    if (result.success && result.imageUrl) {
+                        aiImage.src = result.imageUrl;
+                        aiResult.classList.remove('hidden');
+                        document.getElementById('ai-meta').innerText = `Generated in ${ result.debug?.totalDuration } ms`;
+                    } else {
+                        throw new Error(result.error || "Generation Failed");
+                    }
+
+                } catch (error) {
+                    showAlert(error.message, 'error-message');
+                } finally {
+                    setLoading(false);
+                }
+            });
+
+            function setLoading(bool) {
+                if (bool) {
+                    loading.classList.remove('hidden');
+                } else {
+                    loading.classList.add('hidden');
+                }
+            }
+
+            function showAlert(msg, className) {
+                alertBox.className = className;
+                alertBox.innerText = msg;
+                alertBox.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+
+</html>

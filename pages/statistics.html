@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>What I Own - Statistics</title>
+    <link rel="stylesheet" href="../css/style.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@14.0.1"></script>
+    <script src="../js/app.js"></script>
+    <style>
+        .stat-card {
+            background: #252525;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 3em;
+            color: var(--accent-color);
+            font-weight: bold;
+        }
+
+        .bar-chart {
+            display: flex;
+            align-items: flex-end;
+            height: 200px;
+            gap: 10px;
+            margin-top: 20px;
+            padding: 10px;
+            background: #111;
+            border-radius: 8px;
+        }
+
+        .bar {
+            flex: 1;
+            background: var(--accent-color);
+            transition: height 0.5s;
+            position: relative;
+        }
+
+        .bar:hover {
+            opacity: 0.8;
+        }
+
+        .bar-label {
+            position: absolute;
+            bottom: -25px;
+            width: 100%;
+            text-align: center;
+            font-size: 0.8em;
+            color: #aaa;
+        }
+    </style>
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="logo">
+            <h3>What I Own</h3>
+        </div>
+        <div class="nav-links">
+            <a href="dashboard.html">Dashboard</a>
+            <a href="wardrobe.html">Wardrobe</a>
+            <a href="add-item.html">Add Item</a>
+            <a href="generate-outfit.html">Generate</a>
+            <a href="profile-settings.html">Profile</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h1>Wardrobe Statistics</h1>
+
+        <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 20px;">
+            <div class="stat-card">
+                <div class="stat-number" id="total-val">0</div>
+                <div>Total Items</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="total-val-cost">$0</div>
+                <div>Estimated Value</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="total-outfits">0</div>
+                <div>Outfits Generated</div>
+            </div>
+        </div>
+
+        <h3>Category Breakdown</h3>
+        <div class="card">
+            <div class="bar-chart" id="cat-chart">
+                <!-- Bars injected here -->
+                <p style="margin: auto;">Loading Chart...</p>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Initialize
+            const checkAppwrite = setInterval(async () => {
+                if (window.appwriteService && window.appwriteInitialized) {
+                    clearInterval(checkAppwrite);
+                    loadStats();
+                } else if (window.appwriteService) {
+                    clearInterval(checkAppwrite);
+                    loadStats();
+                }
+            }, 100);
+
+            async function loadStats() {
+                try {
+                    const user = await window.appwriteService.getCurrentUser();
+                    if (!user) return;
+
+                    // Fetch All items (limit 100 for wireframe stats)
+                    const items = await window.appwriteService.listWardrobeItems(user.$id, { limit: 100 });
+
+                    // Total
+                    document.getElementById('total-val').innerText = items.total;
+
+                    // Calculate breakdown
+                    const cats = {};
+                    let totalCost = 0;
+
+                    items.documents.forEach(doc => {
+                        cats[doc.category] = (cats[doc.category] || 0) + 1;
+                        // Mock cost if not present
+                        totalCost += (doc.purchasePrice || 50);
+                    });
+
+                    document.getElementById('total-val-cost').innerText = '$' + totalCost;
+
+                    // Chart
+                    const chart = document.getElementById('cat-chart');
+                    chart.innerHTML = '';
+
+                    const maxVal = Math.max(...Object.values(cats), 1);
+
+                    Object.keys(cats).forEach(cat => {
+                        const count = cats[cat];
+                        const height = (count / maxVal) * 100;
+
+                        const bar = document.createElement('div');
+                        bar.className = 'bar';
+                        bar.style.height = height + '%';
+                        bar.title = `${cat}: ${count}`;
+
+                        bar.innerHTML = `<span class="bar-label">${cat.substring(0, 3)}</span>`;
+                        chart.appendChild(bar);
+                    });
+
+                    // Outfits Count
+                    const outfits = await window.appwriteService.databases.listDocuments(
+                        '695fba61000840feb7f5',
+                        'generated_outfits',
+                        [window.Appwrite.Query.equal('userId', user.$id)]
+                    );
+                    document.getElementById('total-outfits').innerText = outfits.total;
+
+                } catch (error) {
+                    console.error("Stats load error:", error);
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>
